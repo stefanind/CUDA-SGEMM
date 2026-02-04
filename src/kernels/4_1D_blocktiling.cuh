@@ -4,10 +4,8 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 // mark as constants for compile time 
 template <const int BM, const int BN, const int BK, const int TM>
@@ -21,8 +19,8 @@ __global__ void sgemm_1D_blocktiling(int M, int N, int K, float alpha,
     const uint cRow = blockIdx.y;
     const uint cCol = blockIdx.x;
 
-    __shared__ As[BM * BK];
-    __shared__ As[BK * BN];
+    __shared__ float As[BM * BK];
+    __shared__ float As[BK * BN];
 
     const int threadRow = threadIdx.x / BN;
     const int threadCol = threadIdx.x % BN;
@@ -52,7 +50,7 @@ __global__ void sgemm_1D_blocktiling(int M, int N, int K, float alpha,
 
         // advance tiles
         A += BK;
-        B += BN * BK;
+        B += N * BK;
 
         for (uint dotIdx = 0; dotIdx < BK; ++dotIdx) {
 

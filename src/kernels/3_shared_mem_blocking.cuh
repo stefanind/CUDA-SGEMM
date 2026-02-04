@@ -3,10 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 template <const int BLOCKSIZE>
 
@@ -35,7 +33,7 @@ __global__ void sgemm_shared_mem_block(int M, int N, int K, float alpha,
     C += cRow * N * BLOCKSIZE + cCol * BLOCKSIZE;
 
     float temp = 0.0;
-    for (bkIdx = 0; bkIdx < K; bkIdx += BLOCKSIZE) {
+    for (int bkIdx = 0; bkIdx < K; bkIdx += BLOCKSIZE) {
         As[threadRow * BLOCKSIZE + threadCol] = A[threadRow * K + threadCol];
         Bs[threadRow * BLOCKSIZE + threadCol] = B[threadRow * N + threadCol];
 

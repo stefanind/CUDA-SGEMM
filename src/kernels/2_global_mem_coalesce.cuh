@@ -3,15 +3,13 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 /*
 
 BLOCKSIZE = 32
-gridDim(CEIL_DIV(N, BLOCKSIZE), CEIL_DIV(M, BLOCKSIZE), 1)
+gridDim(CEIL_DIV(M, BLOCKSIZE), CEIL_DIV(N, BLOCKSIZE), 1)
 blockDim(BLOCKSIZE * BLOCKSIZE, 1, 1) -> changed so all threads are indexed along x
 
 */

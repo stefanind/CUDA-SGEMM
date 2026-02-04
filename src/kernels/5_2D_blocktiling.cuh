@@ -4,23 +4,16 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 template <const int BM, const int BN, const int BK, const int TM, const int TN>
 
-__global__ void __launch_bounds__((BM * BN) / (TM * TN), 1)
-        sgemm_2D_blocktiling(int M, int N, int K, float alpha, const float *A, 
+__global__ __launch_bounds__((BM * BN) / (TM * TN), 1)
+        void sgemm_2D_blocktiling(int M, int N, int K, float alpha, const float *A, 
                               const float *B, float beta, float *C) {
 
 
-    const int BM = 128;
-    const int BN = 128;
-    const int BK = 8;
-    const int TM = 8;
-    const int TN = 8;
     const uint cRow = blockIdx.y;
     const uint cCol = blockIdx.x;
 

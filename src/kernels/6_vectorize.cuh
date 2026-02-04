@@ -4,10 +4,8 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 template <const int BM, const int BN, const int BK, const int TM, const int TN>
 
@@ -99,14 +97,14 @@ __global__ void sgemm_vectorize(int M, int N, int K, float alpha, const float *A
             float4 temp = reinterpret_cast<float4 *>(
                 &C[(threadRow * TM + resIdxM) * N + threadCol * TN + resIdxN])[0];
             // update values that will be written to C in registers
-            tmp.x = alpha * threadResults[resIdxM * TN + resIdxN + 0] + beta * temp.x;
-            tmp.y = alpha * threadResults[resIdxM * TN + resIdxN + 1] + beta * temp.y;
-            tmp.z = alpha * threadResults[resIdxM * TN + resIdxN + 2] + beta * temp.z;
-            tmp.w = alpha * threadResults[resIdxM * TN + resIdxN + 3] + beta * temp.w;
+            temp.x = alpha * threadResults[resIdxM * TN + resIdxN + 0] + beta * temp.x;
+            temp.y = alpha * threadResults[resIdxM * TN + resIdxN + 1] + beta * temp.y;
+            temp.z = alpha * threadResults[resIdxM * TN + resIdxN + 2] + beta * temp.z;
+            temp.w = alpha * threadResults[resIdxM * TN + resIdxN + 3] + beta * temp.w;
             
             // write to GMEM
             reinterpret_cast<float4 *>(
-                &C[(threadRow * TM + resIdxM) * N + threadCol * TN + resIdxN])[0] = tmp;
+                &C[(threadRow * TM + resIdxM) * N + threadCol * TN + resIdxN])[0] = temp;
         }
     }
 

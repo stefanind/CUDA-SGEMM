@@ -13,7 +13,7 @@ A = M x K -> A[row * K + k]
 B = K x N -> B[k * N + col]
 C = M x N -> C[row * N + col]
 
-dim3 gridDim(CEIL_DIV(N, 32), CEIL_DIV(M, 32), 1);
+dim3 gridDim(CEIL_DIV(M, 32), CEIL_DIV(N, 32), 1);
 dim3 blockDim(32, 32, 1);
 
 sgemm_naive<<<gridDim, blockDim>>>(M, N, K, alpha, A, B, beta, C)
