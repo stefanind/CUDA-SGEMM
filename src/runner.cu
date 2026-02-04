@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <vector>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
 
 #include "kernels.cuh"  // should include your sgemm_naive kernel
 
@@ -69,6 +70,67 @@ int main(int argc, char** argv) {
   printf("M=%d N=%d K=%d\n", M, N, K);
   printf("time = %.4f ms\n", ms);
   printf("perf = %.2f GFLOP/s\n", gflops);
+
+
+  // ----------------------------
+  // cuBLAS baseline
+  // ----------------------------
+  cublasHandle_t handle;
+  cublasCreate(&handle);
+
+  // Optional: control TF32 behavior (important on Ampere+)
+  // If you want "true FP32" (slower), use DEFAULT_MATH (often disables TF32 tensor cores).
+  // If you want fastest, allow TF32 tensor cores.
+  // cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH);           // more strict
+  // cublasSetMathMode(handle, CUBLAS_TF32_TENSOR_OP_MATH);    // faster on A100 etc.
+
+  // reset C to 0 for fair comparison
+  cudaMemset(dC, 0, C.size() * sizeof(float));
+
+  // warmup
+  for (int i = 0; i < 5; i++) {
+    // Compute C^T (N x M) = B^T (N x K) * A^T (K x M)
+    // Column-major gemm: (N x K) * (K x M) = (N x M)
+    cublasSgemm(handle,
+                CUBLAS_OP_N, CUBLAS_OP_N,
+                N, M, K,
+                &alpha,
+                dB, N,     // B treated as (N x K) in column-major == B^T in row-major
+                dA, K,     // A treated as (K x M) in column-major == A^T in row-major
+                &beta,
+                dC, N);
+  }
+  cudaDeviceSynchronize();
+
+  // time cuBLAS with events (same style)
+  cudaEventRecord(start);
+  for (int i = 0; i < iters; i++) {
+    cublasSgemm(handle,
+                CUBLAS_OP_N, CUBLAS_OP_N,
+                N, M, K,
+                &alpha,
+                dB, N,
+                dA, K,
+                &beta,
+                dC, N);
+  }
+  cudaEventRecord(stop);
+  cudaEventSynchronize(stop);
+
+  float cublas_ms;
+  cudaEventElapsedTime(&cublas_ms, start, stop);
+  cublas_ms /= iters;
+
+  double cublas_gflops = (flops / (cublas_ms / 1000.0)) / 1e9;
+
+  printf("cuBLAS time = %.4f ms\n", cublas_ms);
+  printf("cuBLAS perf = %.2f GFLOP/s\n", cublas_gflops);
+
+  cublasDestroy(handle);
+
+  // sanity check output value 
+  cudaMemcpy(C.data(), dC, C.size() * sizeof(float), cudaMemcpyDeviceToHost);
+  printf("Verification: C[0] = %.2f (Expected %.2f)\n", C[0], (float)K * alpha);
 
   // 9) Cleanup
   cudaEventDestroy(start);
