@@ -46,17 +46,17 @@ __global__ void sgemm_vectorize(int M, int N, int K, float alpha, const float *A
         // GMEM to SMEM loads
         float4 temp = 
             // temp becomes the first 4 elements from the index
-            reinterpret_cast<float4 *>(&A[innerRowA * K + innerColA * 4])[0];
+            reinterpret_cast<const float4 *>(&A[innerRowA * K + innerColA * 4])[0];
         // load the 4 into SMEM using transpose of A
-        As[(innerRowA * 4 + 0) * BM + innerRowA] = temp.x;
-        As[(innerRowA * 4 + 1) * BM + innerRowA] = temp.y;
-        As[(innerRowA * 4 + 2) * BM + innerRowA] = temp.z;
-        As[(innerRowA * 4 + 3) * BM + innerRowA] = temp.w;
+        As[(innerColA * 4 + 0) * BM + innerRowA] = temp.x;
+        As[(innerColA * 4 + 1) * BM + innerRowA] = temp.y;
+        As[(innerColA * 4 + 2) * BM + innerRowA] = temp.z;
+        As[(innerColA * 4 + 3) * BM + innerRowA] = temp.w;
 
         // why is this faster than manually unrolling it?
         // if unrolled, why doesn't the compiler coalesce it to also give 128b loads?
         reinterpret_cast<float4 *>(&Bs[innerRowB * BN + innerColB * 4])[0] =
-            reinterpret_cast<float4 *>(&B[innerRowB * N + innerColB * 4])[0];
+            reinterpret_cast<const float4 *>(&B[innerRowB * N + innerColB * 4])[0];
 
         __syncthreads();
 
