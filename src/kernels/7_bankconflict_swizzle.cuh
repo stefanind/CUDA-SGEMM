@@ -4,10 +4,8 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-#define CEIL_DIV(M, N) (((M) + (N)-1) / (N))
 
 template <const int BM, const int BN, const int BK, const int TM, const int TN>
 
@@ -20,8 +18,8 @@ __global__ void sgemm_bank_conflicts(int M, int N, int K, float alpha, float *A,
     const uint col_thread = threadIdx.x % (BN / TN);
     const uint row_thread = threadIdx.x / (BN / TN);
 
-    __shared__ As[BM * BK];
-    __shared__ Bs[BK * BN];
+    __shared__ float As[BM * BK];
+    __shared__ float Bs[BK * BN];
 
     A += row * K * BM;
     B += col * BN;

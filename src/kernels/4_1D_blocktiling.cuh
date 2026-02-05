@@ -20,7 +20,7 @@ __global__ void sgemm_1D_blocktiling(int M, int N, int K, float alpha,
     const uint cCol = blockIdx.x;
 
     __shared__ float As[BM * BK];
-    __shared__ float As[BK * BN];
+    __shared__ float Bs[BK * BN];
 
     const int threadRow = threadIdx.x / BN;
     const int threadCol = threadIdx.x % BN;

@@ -11,4 +11,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
 # use the build system CMake generated in build/ and compile
 # -j triggers a parallel build 
-cmake --build build -j
+cmake --build build -j"$(nproc)"
+
+
+# sanity info
+command -v nvidia-smi >/dev/null && nvidia-smi || true
+command -v nvcc >/dev/null && nvcc --version || true
