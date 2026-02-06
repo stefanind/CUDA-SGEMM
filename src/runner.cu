@@ -21,7 +21,7 @@
 //
 // Notes:
 // - Assumes row-major A(MxK), B(KxN), C(MxN).
-// - cuBLAS is column-major; we compute C^T = B^T * A^T so memory matches row-major C.
+// - cuBLAS is column-major; compute C^T = B^T * A^T so memory matches row-major C.
 // - "Strict FP32" baseline: CUBLAS_DEFAULT_MATH (TF32 tensor-op mode NOT enabled).
 
 #include <cstdio>
@@ -33,10 +33,20 @@
 #include <functional>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include <nvtx3/nvToolsExt.h>
+#include <cuda_profiler_api.h>   // optional, for cudaProfilerStart/Stop capture
 
 #include "kernels.cuh"
 
 // ------------------ helpers ------------------
+struct NvtxRange {
+  NvtxRange(const char* msg) { nvtxRangePushA(msg); }
+  ~NvtxRange() { nvtxRangePop(); }
+};
+
+static inline void nvtx_push_str(const std::string& s) { nvtxRangePushA(s.c_str()); }
+static inline void nvtx_pop() { nvtxRangePop(); }
+
 #define CEIL_DIV(a,b) (((a) + (b) - 1) / (b))
 
 #define CUDA_CHECK(call) do {                                     \
@@ -56,6 +66,7 @@
     std::exit(1);                                                 \
   }                                                               \
 } while(0)
+// ---------------------------------------------
 
 static inline double gflops_from_ms(int M, int N, int K, float ms) {
   const double flops = 2.0 * (double)M * (double)N * (double)K;
@@ -194,6 +205,7 @@ int main(int argc, char** argv) {
   std::string which = "all";
   int M = 1024, N = 1024, K = 1024;
   const char* log_path = nullptr;
+  bool profile_only_timing = false;
 
   // Parse args:
   //   runner [kernel] [M N K] [--log file.csv]
@@ -202,6 +214,7 @@ int main(int argc, char** argv) {
     if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
       usage(argv[0]);
       return 0;
+
     } else if (std::strcmp(argv[i], "--log") == 0) {
       if (i + 1 >= argc) {
         std::fprintf(stderr, "--log requires a path\n");
@@ -209,28 +222,52 @@ int main(int argc, char** argv) {
       }
       log_path = argv[i + 1];
       i++;
+
+    } else if (std::strcmp(argv[i], "--profile") == 0) {
+      profile_only_timing = true;
+
+    } else if (std::strcmp(argv[i], "--iters") == 0) {
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--iters requires an int\n");
+        return 1;
+      }
+      iters = std::atoi(argv[i + 1]);
+      i++;
+
+    } else if (std::strcmp(argv[i], "--warmup") == 0) {
+      if (i + 1 >= argc) {
+        std::fprintf(stderr, "--warmup requires an int\n");
+        return 1;
+      }
+      warmup = std::atoi(argv[i + 1]);
+      i++;
+
     } else if (which == "all" && i == 1) {
-      // first positional arg: kernel name (optional)
       which = argv[i];
+
     } else if (i + 2 < argc) {
-      // try parse M N K at this position
       M = std::atoi(argv[i]);
       N = std::atoi(argv[i + 1]);
       K = std::atoi(argv[i + 2]);
       i += 2;
+
     } else {
       // unknown trailing
     }
   }
 
+
   if (M <= 0 || N <= 0 || K <= 0) {
     std::fprintf(stderr, "Invalid sizes M N K\n");
     return 1;
   }
+  
+  if (warmup < 0) warmup = 0;
+  if (iters <= 0) iters = 1;
 
   const float alpha = 1.0f, beta = 0.0f;
-  const int warmup = 5;
-  const int iters  = 50;
+  int warmup = 5;
+  int iters  = 50;
 
   // GPU info for logging
   cudaDeviceProp prop{};
@@ -328,7 +365,6 @@ int main(int argc, char** argv) {
 
   // 1d blocktiling (example params)
   {
-    // Ensure your kernel uses Bs correctly and its asserts match your design.
     constexpr int BM = 64, BN = 64, BK = 8, TM = 8;
     dim3 block(BM * BK, 1, 1);                   // 512 threads
     dim3 grid(CEIL_DIV(N, BN), CEIL_DIV(M, BM));  // x=col tiles, y=row tiles
@@ -382,7 +418,12 @@ int main(int argc, char** argv) {
                 ks.name, max_abs, max_rel);
 
     // timed run
-    float ms = time_kernel(ks.name, ks.launch, dC, bytesC, start, stop, warmup, iters);
+    float ms = 0.0f;
+    {
+      std::string s = std::string("TIME: ") + ks.name;
+      NvtxRange r(s.c_str());
+      ms = time_kernel(ks.name, ks.launch, dC, bytesC, start, stop, warmup, iters);
+    }
     double gf = gflops_from_ms(M,N,K, ms);
     double pct = (cublas_gflops > 0.0) ? (100.0 * gf / cublas_gflops) : 0.0;
 
@@ -392,6 +433,8 @@ int main(int argc, char** argv) {
     append_csv_row(log_path, prop.name, ks.name, M,N,K, alpha,beta, math_mode,
                    ms, gf, pct, max_abs, max_rel);
   };
+
+  if (profile_only_timing) cudaProfilerStart();
 
   // selection
   if (which == "all") {
@@ -405,6 +448,8 @@ int main(int argc, char** argv) {
     }
     run_and_report(*ks);
   }
+
+  if (profile_only_timing) cudaProfilerStop();
 
   // cleanup
   CUBLAS_CHECK(cublasDestroy(handle));
