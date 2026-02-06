@@ -1,3 +1,16 @@
+### Build
+
+Requires an NVIDIA GPU with CUDA installed.
+
+```bash
+./scripts/build.sh
+```
+
+### Plotting (optional)
+
+Plot generation is Python-only and can be run on any machine.
+
+
 ## Benchmarks (SGEMM)
 
 **GPU:** NVIDIA GeForce RTX 4070  
