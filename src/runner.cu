@@ -204,6 +204,8 @@ struct KernelSpec {
 int main(int argc, char** argv) {
   std::string which = "all";
   int M = 1024, N = 1024, K = 1024;
+  int iters = 100;    // default benchmark iterations
+  int warmup = 10;    // default warmup iterations
   const char* log_path = nullptr;
   bool profile_only_timing = false;
 
@@ -266,8 +268,6 @@ int main(int argc, char** argv) {
   if (iters <= 0) iters = 1;
 
   const float alpha = 1.0f, beta = 0.0f;
-  int warmup = 5;
-  int iters  = 50;
 
   // GPU info for logging
   cudaDeviceProp prop{};
